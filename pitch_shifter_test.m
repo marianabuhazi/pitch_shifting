@@ -4,7 +4,7 @@
 % Writes randomly-generated numbers to file in_data
 
 in_data = fopen('./in_data', 'w');
-for i = 1:10
+for i = 1:100
     random= randi([0,1],1, 24);
     print_format = [repmat('%g', 1, numel(random)-1), '%g\n'];
     fprintf(in_data, print_format, random);

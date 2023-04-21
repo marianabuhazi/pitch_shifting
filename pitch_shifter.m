@@ -3,7 +3,7 @@
 l = 1024;
 
 % Shifting factor
-% 0.85 for low pitch
+% 0.8 for low pitch
 % 1 for normal voice
 % 1.65 for high pitch
 shift_factor = 0.8;
@@ -21,10 +21,10 @@ samples = sin(2*pi*440*x);
 % ------------- BUFFERS AND POINTERS ------------- %
 % Create 2 buffers for left data, and two buffers for right data
 % Initialize buffers to zero
+l_buf_0 = zeros(1, l);
 l_buf_1 = zeros(1, l);
-l_buf_2 = zeros(1, l);
+r_buf_0 = zeros(1, l);
 r_buf_1 = zeros(1, l);
-r_buf_2 = zeros(1, l);
 
 % Output array of shifted samples
 % In hardware implementation, samples will be streamed to Avalon bus
@@ -33,31 +33,31 @@ r_buf_2 = zeros(1, l);
 out_left = zeros(length(samples),1);
 out_right = zeros(length(samples),1);
 
-% Read and write pointers for l_buf_1, l_buf_2, r_buf_1, and r_buf_2
-% Initialize w_1 to 1. MATLAB arrays start at 1.
-% Initialize w_2 to 180 deg shifted cell.
+% Read and write pointers for l_buf_0, l_buf_1, r_buf_0, and r_buf_1
+% Initialize w_0 to 1. MATLAB arrays start at 1.
+% Initialize w_1 to 180 deg shifted cell.
 
 % l_buf write
-l_w_1 = 1;
-l_w_2 = floor(l/2);
+l_w_0 = 1;
+l_w_1 = floor(l/2);
 
 % l_buf read
+l_r_0 = 1;
 l_r_1 = 1;
-l_r_2 = 1;
 
 % r_buf write
-r_w_1 = 1;
-r_w_2 = floor(l/2);
+r_w_0 = 1;
+r_w_1 = floor(l/2);
 
 % r_buf read
+r_r_0 = 1;
 r_r_1 = 1;
-r_r_2 = 1;
 
 % Indexing for read pointers
+l_i_0= 0;
 l_i_1= 0;
-l_i_2= 0;
+r_i_0= 0;
 r_i_1= 0;
-r_i_2= 0;
 
 % ------------- ALGORITHM ------------- %
 % Read one sample at a time from the array of samples
@@ -67,50 +67,50 @@ for i=1:length(samples)
     % LEFT BUFFER 
     % Add the sample to l_buf_1 at address l_w_1
     % Advance l_w_1
-    l_buf_1(l_w_1) = samples(i);
-    l_w_1 = mod(i, l) + 1;
+    l_buf_0(l_w_0) = samples(i);
+    l_w_0 = mod(i, l) + 1;
 
     % Add the sample to l_buf_2
     % Advance l_w_2
-    l_buf_2(l_w_2) = samples(i);
-    l_w_2 = mod(i+floor(l/2), l) + 1;
+    l_buf_1(l_w_1) = samples(i);
+    l_w_1 = mod(i+floor(l/2), l) + 1;
 
     % Read from l_buf_1 at address l_r_1
+    l_i_0= l_i_0 + shift_factor;
+    l_r_0 = mod(floor(l_i_0), l) + 1;
+
+    % Read from l_buf_2 at address l_r_2
     l_i_1= l_i_1 + shift_factor;
     l_r_1 = mod(floor(l_i_1), l) + 1;
 
-    % Read from l_buf_2 at address l_r_2
-    l_i_2= l_i_2 + shift_factor;
-    l_r_2 = mod(floor(l_i_2), l) + 1;
-
 
     % RIGHT BUFFER 
-    % Add the sample to l_buf_1 at address l_w_1
-    % Advance l_w_1
-    r_buf_1(r_w_1) = samples(i);
-    r_w_1 = mod(i, l) + 1;
+    % Add the sample to r_buf_0 at address r_w_0
+    % Advance l=r_w_0
+    r_buf_0(r_w_0) = samples(i);
+    r_w_0 = mod(i, l) + 1;
 
-    % Add the sample to l_buf_2
-    % Advance l_w_2
-    r_buf_2(r_w_2) = samples(i);
-    r_w_2 = mod(i + floor(l/2), l) + 1;
+    % Add the sample to r_buf_1
+    % Advance r_w_1
+    r_buf_1(r_w_1) = samples(i);
+    r_w_1 = mod(i + floor(l/2), l) + 1;
+
+    % Read from r_buf_0 at address r_r_0
+    r_i_0= r_i_0 + shift_factor;
+    r_r_0 = mod(floor(r_i_0), l) + 1;
 
     % Read from l_buf_1 at address l_r_1
     r_i_1= r_i_1 + shift_factor;
     r_r_1 = mod(floor(r_i_1), l) + 1;
 
-    % Read from l_buf_2 at address l_r_2
-    r_i_2= r_i_2 + shift_factor;
-    r_r_2 = mod(floor(r_i_2), l) + 1;
-
-    out_left(i) = 0.5*(l_buf_1(l_r_1) + l_buf_2(l_r_2));
-    out_right(i) = 0.5*(r_buf_1(r_r_1) + r_buf_2(r_r_2));
+    out_left(i) = 0.5*(l_buf_0(l_r_0) + l_buf_1(l_r_1));
+    out_right(i) = 0.5*(r_buf_0(r_r_0) + r_buf_1(r_r_1));
 
 end
 
 % ------------- WAVEFORM VIZUALIZATION & SOUND------------- %
 % Listen to the original audio
-% sound(samples, fs);
+% sound(out_left, fs);
 
 % ------------- VISUALIZE PITCH-SHIFT ------------- %
 % Filter only in the human voice range using 4th order Butterworth filter
@@ -164,6 +164,6 @@ xlim([1000, 1100]);
 ylim([-1.15, 1.15]);
 
 % Listen to the pitch-shifted audio
-% sound(out_filtered, fs);
+sound(out_filtered, fs);
 
 
